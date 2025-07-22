@@ -1,8 +1,10 @@
 import os
+import time
 import webbrowser
 
 from dotenv import load_dotenv
-from database import Product, Base
+from scraper import scrape_competitor_product
+from database import Base, Product, Competitor
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import streamlit as st
@@ -73,17 +75,37 @@ def display_product_details(product):
 
 def add_competitor_form(product, session):
     """Form to add a new competitor"""
+
     with st.expander("Add new competitor", expanded=False):
         with st.form(f"add_competitor_{product.id}"):
             competitor_url = st.text_input("🔗 Competitor product URL")
             col1, col2 = st.columns([3, 1])
             with col2:
                 submit = st.form_submit_button(
-                "Add competitor", use_container_width=True
+                    "Add competitor", use_container_width=True
                 )
+
             if submit:
-                # TODO: Add competitor to the database
-                st.success("Competitor added successfully!")
+                try:
+                    with st.spinner("Fetching competitor data..."):
+                        data = scrape_competitor_product(competitor_url)
+                        competitor = Competitor(
+                            product_id=product.id,
+                            url=competitor_url,
+                            name=data["name"],
+                            current_price=data["price"],
+                            image_url=data.get("image_url"),
+                            last_checked=data["last_checked"],
+                        )
+                        session.add(competitor)
+                        session.commit()
+                        st.success("✅ Competitor added successfully!")
+
+                        # Refresh the page
+                        time.sleep(1)
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error adding competitor: {str(e)}")
 
 def main():
     st.title("Competitor Price Monitor")
