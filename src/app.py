@@ -4,18 +4,20 @@ import webbrowser
 
 from dotenv import load_dotenv
 from scraper import scrape_competitor_product
-from database import Base, Product, Competitor
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from urllib.parse import urlparse
 import streamlit as st
+from database import Base, Competitor, Product
 
 # Load environment variables
 load_dotenv()
 
-# Database setup - creates the tables we specify
+# Database setup
 engine = create_engine(os.getenv("POSTGRES_URL"))
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
+
 
 def add_product():
     """Form to add a new product"""
@@ -34,14 +36,39 @@ def add_product():
             return True
     return False
 
-def delete_product(product_id: str):
-    """Delete a product and all its competitors"""
-    session = Session()
-    product = session.query(Product).filter_by(id=product_id).first()
-    if product:
-        session.delete(product)
-        session.commit()
-    session.close()
+
+def display_competitor_metrics(product, comp):
+    """Display competitor price comparison metrics"""
+    st.markdown(f"#### {urlparse(comp.url).netloc}")
+    cols = st.columns([1, 2, 1, 1])
+
+    diff = ((comp.current_price - product.your_price) / product.your_price) * 100
+
+    with cols[0]:
+        st.metric(
+            label="💰 Competitor price",
+            value=f"${comp.current_price:.2f}",
+            delta=f"{diff:+.1f}%",
+            delta_color="normal",
+        )
+    with cols[1]:
+        st.markdown(f"**🕒 Checked:** {comp.last_checked.strftime('%Y-%m-%d %H:%M')}")
+    with cols[2]:
+        st.button(
+            "Visit product",
+            key=f"visit_btn_{comp.id}",
+            use_container_width=True,
+            on_click=lambda: webbrowser.open_new_tab(comp.url),
+        )
+    with cols[3]:
+        st.button(
+            "🗑️",
+            key=f"delete_comp_btn_{comp.id}",
+            type="primary",
+            use_container_width=True,
+            on_click=lambda: delete_competitor(comp.id),
+        )
+
 
 def display_product_details(product):
     """Display details for a single product"""
@@ -73,9 +100,19 @@ def display_product_details(product):
                 on_click=lambda: delete_product(product.id),
             )
 
+
+def display_competitors(product):
+    """Display all competitors for a product"""
+    if product.competitors:
+        with st.expander("View competitors", expanded=False):
+            for comp in product.competitors:
+                display_competitor_metrics(product, comp)
+    else:
+        st.info("No competitors added yet")
+
+
 def add_competitor_form(product, session):
     """Form to add a new competitor"""
-
     with st.expander("Add new competitor", expanded=False):
         with st.form(f"add_competitor_{product.id}"):
             competitor_url = st.text_input("🔗 Competitor product URL")
@@ -107,6 +144,27 @@ def add_competitor_form(product, session):
                 except Exception as e:
                     st.error(f"❌ Error adding competitor: {str(e)}")
 
+
+def delete_product(product_id: str):
+    """Delete a product and all its competitors"""
+    session = Session()
+    product = session.query(Product).filter_by(id=product_id).first()
+    if product:
+        session.delete(product)
+        session.commit()
+    session.close()
+
+
+def delete_competitor(competitor_id: str):
+    """Delete a competitor"""
+    session = Session()
+    competitor = session.query(Competitor).filter_by(id=competitor_id).first()
+    if competitor:
+        session.delete(competitor)
+        session.commit()
+    session.close()
+
+
 def main():
     st.title("Competitor Price Monitor")
     st.markdown(
@@ -130,9 +188,11 @@ def main():
         for product in products:
             with st.container():
                 display_product_details(product)
+                display_competitors(product)
                 add_competitor_form(product, session)
 
     session.close()
-    
+
+
 if __name__ == "__main__":
     main()

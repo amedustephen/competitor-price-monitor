@@ -5,6 +5,7 @@ import uuid
 
 Base = declarative_base()
 
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -16,9 +17,10 @@ class Product(Base):
         "Competitor", back_populates="product", cascade="all, delete-orphan"
     )
 
+
 class Competitor(Base):
     __tablename__ = "competitors"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     product_id = Column(String, ForeignKey("products.id"))
     url = Column(String, nullable=False)
@@ -27,3 +29,13 @@ class Competitor(Base):
     last_checked = Column(DateTime, default=datetime.utcnow)
     image_url = Column(String)
     product = relationship("Product", back_populates="competitors")
+
+
+if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    engine = create_engine(os.getenv("POSTGRES_URL"))
+    Base.metadata.create_all(engine)
