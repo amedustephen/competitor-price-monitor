@@ -34,6 +34,6 @@ def update_competitor_prices():
     session.commit()
     session.close()
 
-
+# To allow running the script directly
 if __name__ == "__main__":
     update_competitor_prices()

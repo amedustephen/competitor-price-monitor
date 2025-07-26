@@ -3,6 +3,7 @@ import time
 import webbrowser
 
 from dotenv import load_dotenv
+from utils import is_valid_url
 from scraper import scrape_competitor_product
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -123,26 +124,31 @@ def add_competitor_form(product, session):
                 )
 
             if submit:
-                try:
-                    with st.spinner("Fetching competitor data..."):
-                        data = scrape_competitor_product(competitor_url)
-                        competitor = Competitor(
-                            product_id=product.id,
-                            url=competitor_url,
-                            name=data["name"],
-                            current_price=data["price"],
-                            image_url=data.get("image_url"),
-                            last_checked=data["last_checked"],
-                        )
-                        session.add(competitor)
-                        session.commit()
-                        st.success("✅ Competitor added successfully!")
+                if not competitor_url :
+                    st.error("Please enter a competitor URL")
+                elif not is_valid_url(competitor_url):
+                    st.error("Please enter a valid URL")
+                else:
+                    try:
+                        with st.spinner("Fetching competitor data..."):
+                            data = scrape_competitor_product(competitor_url)
+                            competitor = Competitor(
+                                product_id=product.id,
+                                url=competitor_url,
+                                name=data["name"],
+                                current_price=data["price"],
+                                image_url=data.get("image_url"),
+                                last_checked=data["last_checked"],
+                            )
+                            session.add(competitor)
+                            session.commit()
+                            st.success("✅ Competitor added successfully!")
 
-                        # Refresh the page
-                        time.sleep(1)
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error adding competitor: {str(e)}")
+                            # Refresh the page
+                            time.sleep(1)
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error adding competitor: {str(e)}")
 
 
 def delete_product(product_id: str):
